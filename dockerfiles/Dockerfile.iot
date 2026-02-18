@@ -1,0 +1,24 @@
+# Use a lightweight Python base image
+FROM python:3.14-slim
+
+# Set the working directory
+WORKDIR /app
+
+# Copy the application code
+COPY ../src/IoT_node/ .
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Create directory for certificates
+#RUN mkdir -p /app/certs
+
+#COPY ../certs/cert.pem certs/cert.pem
+#COPY ../certs/key.pem certs/key.pem
+
+# Set the GRPC_SERVER_URL environment variable
+#ENV GRPC_SERVER_URL=server:50051
+#ENV PYTHONUNBUFFERED=1
+
+# Start the gRPC client
+CMD ["python", "-u", "IoT_node.py"]

@@ -1,0 +1,66 @@
+name: IoT_Gateway
+services:
+  mqtt:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto
+    ports:
+      - "1883:1883" #default mqtt port
+    volumes:
+      - ./mosquitto/config:/mosquitto/config:rw
+      - ./mosquitto/data:/mosquitto/data:rw
+      - ./mosquitto/log:/mosquitto/log:rw
+
+  coordinator:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.coordinator
+    container_name: coordinator
+    environment:
+      MQTT_SERVER: "mosquitto"
+      MQTT_PORT: "1883"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker-compose.yml:/docker-compose.yml
+    depends_on:
+      - mqtt
+
+  iot_node_1:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.iot
+    container_name: iot_node_1
+    environment:
+      MQTT_SERVER: "mosquitto"
+      MQTT_PORT: "1883"
+      SENSOR_ID: "1"
+    depends_on:
+      - mqtt
+      - coordinator
+
+  iot_node_2:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.iot
+    container_name: iot_node_2
+    environment:
+      MQTT_SERVER: "mosquitto"
+      MQTT_PORT: "1883"
+      SENSOR_ID: "2"
+    depends_on:
+      - mqtt
+      - coordinator
+
+  gateway:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.gateway
+    #container_name: gateway
+    environment:
+      MQTT_SERVER: "mosquitto"
+      MQTT_PORT: "1883"
+#      GATEWAY_ID: "1"
+    deploy:
+      replicas: 2
+    depends_on:
+      - mqtt
+      #- coordinator

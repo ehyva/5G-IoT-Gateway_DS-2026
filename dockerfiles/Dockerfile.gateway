@@ -1,0 +1,16 @@
+# Use a lightweight Python base image
+FROM python:3.14-slim
+
+# Set the working directory
+WORKDIR /app
+
+# Copy the application code
+COPY ../src/edge_gateway/ .
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+#EXPOSE 8000
+
+# Start the edge gateway
+CMD ["python", "-u", "gateway.py"]

@@ -1,0 +1,17 @@
+# Use a lightweight Python base image
+FROM python:3.14-slim
+
+RUN apt-get update && apt-get install -y \
+    docker-compose 
+
+# Set the working directory
+WORKDIR /app
+
+# Copy the application code
+COPY ../src/coordinator/ .
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Start the coordinator
+CMD ["python", "-u", "coordinator.py"]
