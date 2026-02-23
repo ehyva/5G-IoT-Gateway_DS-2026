@@ -24,31 +24,20 @@ services:
     depends_on:
       - mqtt
 
-  iot_node_1:
+  iot_node:
     build:
       context: .
       dockerfile: dockerfiles/Dockerfile.iot
-    container_name: iot_node_1
+    #container_name: iot_node
     environment:
       MQTT_SERVER: "mosquitto"
       MQTT_PORT: "1883"
-      SENSOR_ID: "1"
-    depends_on:
-      - mqtt
-      - coordinator
-
-  iot_node_2:
-    build:
-      context: .
-      dockerfile: dockerfiles/Dockerfile.iot
-    container_name: iot_node_2
-    environment:
-      MQTT_SERVER: "mosquitto"
-      MQTT_PORT: "1883"
-      SENSOR_ID: "2"
-    depends_on:
-      - mqtt
-      - coordinator
+#      SENSOR_ID: "2"
+    deploy:
+      replicas: 5
+#    depends_on:
+#      - mqtt
+#      - coordinator
 
   gateway:
     build:

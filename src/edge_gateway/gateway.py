@@ -14,13 +14,13 @@ class EdgeGateway:
         self.running = False
         self.start_time = None
         self.sensor_list = set()
+        self.gateway_id = None
 
         self.host = os.environ.get('SERVER_HOST', '0.0.0.0')
         self.port = int(os.environ.get('SERVER_PORT', '8000'))
 
         self.mqtt_broker = os.getenv('MQTT_SERVER', "localhost")
         self.mqtt_port = int(os.getenv('MQTT_PORT', "1883"))
-        self.gateway_id = int(os.getenv('GATEWAY_ID', "1"))
 
         self.mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self.mqtt_client.on_connect = self.on_connect
@@ -189,7 +189,7 @@ class EdgeGateway:
             print("MQTT connection failed: " + str(e))
             exit(1)
 
-        self.mqtt_client.loop_start()  
+        self.mqtt_client.loop_start()
 
         # Create and configure socket
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -203,13 +203,41 @@ class EdgeGateway:
         self.log(f"Process ID: {os.getpid()}")
         self.log(f"Hostname: {os.environ.get('HOSTNAME', socket.gethostname())}")
         
+        coordinator_check = 0
+        coordinator_check_time = time.monotonic()
+
         with ThreadPoolExecutor(max_workers=2) as executor:
             while self.running:
+                # Handle coordinator health checks and handling sensors
                 try:
                     client_socket, address = server_socket.accept()
                     executor.submit(self.handle_coordinator, client_socket, address)
                 except socket.timeout:
                     continue  # Check if still running
+
+                # Check if coordinator is running. Shut down gateway if coordinator is not reachable for 3 times
+                if coordinator_check_time < time.monotonic():
+                    coordinator_check_time = time.monotonic() + 10
+                    try:
+                        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        sock.connect(('coordinator', 8001))
+                        sock.send(b'GET /health HTTP/1.1\r\n\r\n')
+                    
+                        response = sock.recv(1024).decode()
+                        body = json.loads(response.split('\r\n\r\n', 1)[-1])
+
+                        if body['status'] == "healthy":
+                            coordinator_check = 0
+                        else:
+                            coordinator_check += 1
+
+
+                    except Exception as e:
+                        coordinator_check += 1
+                    
+                    if coordinator_check >= 3:
+                        self.running = False
+
         
         server_socket.close()
         self.log("Server stopped")
