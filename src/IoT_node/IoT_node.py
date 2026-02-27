@@ -4,6 +4,7 @@ import os
 import socket
 import random
 import json
+import math
 
 class IoTSensor:
 
@@ -60,12 +61,12 @@ class IoTSensor:
             self.join_network()
             time.sleep(5)
                 
-
+        random.seed(self.sensor_id)
         while True:
-            temperature = str(random.randint(-40,40))
+            temperature = int(40 * math.cos(time.time() / 5.0) + 12 * random.gauss())
             mqtt_message = {
                 "timestamp": time.time(),
-                "temperature": temperature
+                "temperature": str(temperature)
                 }
 
             mqtt_client.publish(f"sensor/{self.sensor_id}/temperature", json.dumps(mqtt_message))
