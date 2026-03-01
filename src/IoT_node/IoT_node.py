@@ -5,6 +5,7 @@ import socket
 import random
 import json
 import math
+import datetime
 
 class IoTSensor:
 
@@ -60,20 +61,67 @@ class IoTSensor:
         while self.sensor_id is None:
             self.join_network()
             time.sleep(5)
-                
+        
+        # Initialize data generation
         random.seed(self.sensor_id)
+
+        self.n = 0
+        temp_min = -15.0
+        temp_max = 25.0
+        self.a = temp_min + (temp_max - temp_min) / 2.0
+        self.b = (temp_max - temp_min) / 2.0
+
         while True:
-            temperature = int(40 * math.cos(time.time() / 5.0) + 12 * random.gauss())
+            timestamp, temperature = self.daily_data()
+            #temperature = int(a + b * math.cos(time.time() / 5.0) + 5.0 * random.gauss())
             mqtt_message = {
-                "timestamp": time.time(),
-                "temperature": str(temperature)
-                }
+                "timestamp": timestamp,
+                "temperature": temperature
+            }
 
             mqtt_client.publish(f"sensor/{self.sensor_id}/temperature", json.dumps(mqtt_message))
             
-            print(f"Published temp: {temperature}")
+            print(f"Published temp: {temperature} @ {datetime.datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')}")
 
             time.sleep(1)
+
+    # Generate noisy date, using real timestamp
+    def noisy_data(self):
+        timestamp = int(time.time())
+        temperature = random.uniform(temp_min, temp_max)
+        self.n += 1
+        return timestamp, temperature
+    
+    # Generate hourly data
+    def hourly_data(self):
+        hour = self.n % 24
+        day = 1 + int(self.n / 24)
+        datetime = (2026, 1, day, hour, 00, 00, 0, 0, -1)
+        timestamp = time.mktime(datetime)
+        
+        start = time.mktime((2026, 1, 1, 00, 00, 00, 0, 0, -10))
+        phase = (timestamp - start)  / (time.mktime((2027, 1, 1, 00, 00, 00, 0, 0, -1)) - start)
+
+        temperature = int(self.a + self.b * math.cos(math.tau * phase + math.pi))
+
+        self.n += 1
+        return timestamp, temperature
+    
+    # Generate daily data
+    def daily_data(self):
+        
+        datetime = (2026, 1, self.n, 00, 00, 00, 0, 0, -1)
+        timestamp = time.mktime(datetime)
+    
+        start = time.mktime((2026, 1, 1, 00, 00, 00, 0, 0, -10))
+        phase = (timestamp - start)  / (time.mktime((2027, 1, 1, 00, 00, 00, 0, 0, -1)) - start)
+    
+        temperature = int(self.a + self.b * math.cos(math.tau * phase + math.pi))
+
+        self.n += 1
+        return timestamp, temperature
+        
+
 
 
 
