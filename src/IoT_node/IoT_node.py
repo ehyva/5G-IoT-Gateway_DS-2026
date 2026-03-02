@@ -48,12 +48,16 @@ class IoTSensor:
 
         for attempt in range(5):
             try:
-                mqtt_client.connect(self.mqtt_broker, self.mqtt_port, 60)
+                if mqtt_client.connect(self.mqtt_broker, self.mqtt_port, 60) == 0:
+                    break
             except Exception as e:
                 self.log("MQTT connection failed: " + str(e))
-                if attempt == 4:
-                    exit(1)
-                time.sleep(5)
+            except TimeoutError as e:
+                self.log("MQTT connection timed out: " + str(e))
+                
+            if attempt == 4:
+                exit(1)
+            time.sleep(5)
 
         mqtt_client.loop_start()
 
