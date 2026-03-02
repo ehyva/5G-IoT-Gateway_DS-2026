@@ -72,7 +72,7 @@ class IoTSensor:
         self.b = (temp_max - temp_min) / 2.0
 
         while True:
-            timestamp, temperature = self.daily_data()
+            timestamp, temperature = self.hourly_data()
             #temperature = int(a + b * math.cos(time.time() / 5.0) + 5.0 * random.gauss())
             mqtt_message = {
                 "timestamp": timestamp,
@@ -99,10 +99,7 @@ class IoTSensor:
         datetime = (2026, 1, day, hour, 00, 00, 0, 0, -1)
         timestamp = time.mktime(datetime)
         
-        start = time.mktime((2026, 1, 1, 00, 00, 00, 0, 0, -10))
-        phase = (timestamp - start)  / (time.mktime((2027, 1, 1, 00, 00, 00, 0, 0, -1)) - start)
-
-        temperature = int(self.a + self.b * math.cos(math.tau * phase + math.pi))
+        temperature = self.temperature_model(timestamp)
 
         self.n += 1
         return timestamp, temperature
@@ -113,13 +110,18 @@ class IoTSensor:
         datetime = (2026, 1, self.n, 00, 00, 00, 0, 0, -1)
         timestamp = time.mktime(datetime)
     
-        start = time.mktime((2026, 1, 1, 00, 00, 00, 0, 0, -10))
-        phase = (timestamp - start)  / (time.mktime((2027, 1, 1, 00, 00, 00, 0, 0, -1)) - start)
-    
-        temperature = int(self.a + self.b * math.cos(math.tau * phase + math.pi))
+        temperature = self.temperature_model(timestamp)
 
         self.n += 1
         return timestamp, temperature
+
+
+    def temperature_model(self, timestamp):
+        start = time.mktime((2026, 1, 1, 00, 00, 00, 0, 0, -10))
+        phase = (timestamp - start)  / (time.mktime((2027, 1, 1, 00, 00, 00, 0, 0, -1)) - start)
+        offset = math.pi * (11.0 / 12.0)
+        amplitude = math.cos(math.tau * phase + offset) + 0.2 * math.cos(math.tau * phase * 24.0) + random.gauss(0.0, 0.05)
+        return self.a + self.b * amplitude
         
 
 
