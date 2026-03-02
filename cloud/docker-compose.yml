@@ -1,0 +1,98 @@
+version: "3.8"
+
+services:
+  postgres:
+      image: postgres:15
+      container_name: cloud-postgres
+      mem_limit: 2g
+      cpus: 1.0
+      environment:
+        POSTGRES_USER: admin
+        POSTGRES_PASSWORD: admin
+        POSTGRES_DB: cloud
+      ports:
+        - "5432:5432"
+      volumes:
+        - postgres_data:/var/lib/postgresql/data
+      restart: unless-stopped
+
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    mem_limit: 1g
+    cpus: 0.5
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+  mlflow:
+    image: python:3.10
+    container_name: mlflow
+    mem_limit: 1g
+    cpus: 0.5
+    depends_on:
+      - minio
+    ports:
+      - "5000:5000"
+    environment:
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      MLFLOW_SERVER_ALLOWED_HOSTS: ${MLFLOW_SERVER_ALLOWED_HOSTS}
+
+    command: >
+      sh -c "
+      pip install mlflow boto3 &&
+      mlflow server
+      --backend-store-uri sqlite:///mlflow.db
+      --default-artifact-root s3://mlflow
+      --host 0.0.0.0
+      --port 5000
+      --serve-artifacts
+      --allowed-hosts ${MLFLOW_SERVER_ALLOWED_HOSTS} \
+      "
+  
+  trainer:
+    build: ./trainer
+    mem_limit: 2g
+    cpus: 1.0
+    container_name: cloud-trainer
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+    depends_on:
+      - mlflow
+      - minio
+
+  api:
+    build: ./api
+    mem_limit: 1g
+    cpus: 0.5
+    container_name: cloud-api
+    ports:
+      - "8000:8000"
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      DATABASE_URL: postgresql://admin:admin@postgres:5432/cloud
+    depends_on:
+      - postgres
+      - mlflow
+      - minio
+    restart: unless-stopped
+
+
+volumes: 
+  minio_data:
+  postgres_data:
