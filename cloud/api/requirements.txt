@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+psycopg2-binary==2.9.9
+boto3==1.34.0
+mlflow
+torch
+joblib
+numpy
+pandas
+sqlalchemy
