@@ -61,10 +61,8 @@ class IoTSensor:
 
         mqtt_client.loop_start()
 
-        # Join network
-        while self.sensor_id is None:
-            self.join_network()
-            time.sleep(5)
+        # Join network, get sensor ID
+        self.sensor_id = random.randint(0,10000)
         
         # Initialize data generation
         random.seed(self.sensor_id)
