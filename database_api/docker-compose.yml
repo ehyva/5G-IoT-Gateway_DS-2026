@@ -39,7 +39,7 @@ services:
       context: .
       dockerfile: ./Dockerfile.database-api
     container_name: database-api
-    host_name: database-api
+    hostname: database-api
     environment:
       CASSANDRA_IP: "cassandra1"
       CASSANDRA_PORT: "9042"
