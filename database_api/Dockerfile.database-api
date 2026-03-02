@@ -1,0 +1,15 @@
+FROM python:3.10.19-slim
+
+# Set working directory
+WORKDIR /database
+
+# Copy dependencies
+COPY requirements.txt .
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy python script
+COPY database.py .
+
+# Run the script
+CMD ["python", "database.py"]
