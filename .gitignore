@@ -1,2 +1,5 @@
 mosquitto/data/
 mosquitto/log/
+
+grafana/data/*/
+grafana/certs/

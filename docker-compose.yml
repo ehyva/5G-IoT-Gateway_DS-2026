@@ -219,6 +219,21 @@ services:
       - cloud-api-net
     restart: unless-stopped
 
+  grafana:
+    image: grafana/grafana-enterprise
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    networks:
+      - cassandra-net
+      - mqtt-net
+    volumes:
+      - ./grafana/data:/var/lib/grafana:rw
+      - ./grafana/certs:/certs:rw
+    environment:
+      GF_INSTALL_PLUGINS: "hadesarchitect-cassandra-datasource,grafana-mqtt-datasource"
+
 networks:
   mqtt-net:
   cloud-api-net:
