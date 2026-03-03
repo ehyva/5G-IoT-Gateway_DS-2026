@@ -9,6 +9,8 @@ services:
       - ./mosquitto/config:/mosquitto/config:rw
       - ./mosquitto/data:/mosquitto/data:rw
       - ./mosquitto/log:/mosquitto/log:rw
+    networks:
+      - mqtt-net
 
   coordinator:
     build:
@@ -21,8 +23,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./docker-compose.yml:/docker-compose.yml
-    depends_on:
-      - mqtt
+    networks:
+      - mqtt-net
 
   iot_node:
     build:
@@ -35,9 +37,8 @@ services:
 #      SENSOR_ID: "2"
     deploy:
       replicas: 5
-#    depends_on:
-#      - mqtt
-#      - coordinator
+    networks:
+      - mqtt-net
 
   gateway:
     build:
@@ -50,6 +51,181 @@ services:
 #      GATEWAY_ID: "1"
     deploy:
       replicas: 2
+    networks:
+      - mqtt-net
+      - cloud-api-net
+
+  cassandra1:
+    image: cassandra:4.1
+    container_name: cassandra1
+    hostname: cassandra1
+    ports:
+      - "9042:9042"
+    environment:
+      - CASSANDRA_CLUSTER_NAME=TestCluster
+      - CASSANDRA_SEEDS=cassandra1
+      - CASSANDRA_LISTEN_ADDRESS=cassandra1
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra1
+      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+    networks:
+      - cassandra-net
+    volumes:
+      - cassandra1_data:/var/lib/cassandra
+
+# Example of adding another node to this service
+#  cassandra2:
+#    image: cassandra:4.1
+#    container_name: cassandra2
+#    hostname: cassandra2
+#    environment:
+#      - CASSANDRA_CLUSTER_NAME=TestCluster
+#      - CASSANDRA_SEEDS=cassandra1
+#      - CASSANDRA_LISTEN_ADDRESS=cassandra2
+#      - CASSANDRA_BROADCAST_ADDRESS=cassandra2
+#      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+#    depends_on:
+#      - cassandra1
+#    volumes:
+#      - cassandra2_data:/var/lib/cassandra
+#    networks:
+#      - cassandra-net
+
+  database-api:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.database-api
+    container_name: database-api
+    hostname: database-api
+    environment:
+      CASSANDRA_IP: "cassandra1"
+      CASSANDRA_PORT: "9042"
+      SERVER_HOST: "0.0.0.0"
+      PORT: "8000"
+      REPLICATION_FACTOR: "1" # RF
+      CONSISTENCY_LEVEL: "one" # one or quorum, quorum asks ceil(RF/2)+1 nodes before write or read is succesful.
+    ports:
+      - "8000:8000"
+    networks:
+      - cassandra-net
+      - cloud-api-net
     depends_on:
-      - mqtt
-      #- coordinator
+      - cassandra1
+    restart: unless-stopped # It takes a while for cassandra to setup, so this can't connect right away and exits
+
+  postgres:
+    image: postgres:15
+    container_name: cloud-postgres
+    mem_limit: 2g
+    cpus: 1.0
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: cloud
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cloud-int-net
+    restart: unless-stopped
+
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    mem_limit: 1g
+    cpus: 0.5
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - cloud-int-net
+      - cloud-api-net
+
+  mlflow:
+    image: python:3.10
+    container_name: mlflow
+    mem_limit: 1g
+    cpus: 0.5
+    depends_on:
+      - minio
+    ports:
+      - "5000:5000"
+    environment:
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      MLFLOW_SERVER_ALLOWED_HOSTS: \"*\"
+    networks:
+    - cloud-int-net
+
+    command: >
+      sh -c "
+      pip install mlflow boto3 &&
+      mlflow server
+      --backend-store-uri sqlite:///mlflow.db
+      --default-artifact-root s3://mlflow
+      --host 0.0.0.0
+      --port 5000
+      --serve-artifacts
+      --allowed-hosts ${MLFLOW_SERVER_ALLOWED_HOSTS} \
+      "
+  
+  trainer:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.trainer
+    mem_limit: 2g
+    cpus: 1.0
+    container_name: cloud-trainer
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+    depends_on:
+      - mlflow
+      - minio
+    networks:
+      - cloud-int-net
+
+  cloud-api:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.cloud-api
+    mem_limit: 1g
+    cpus: 0.5
+    container_name: cloud-api
+    ports:
+      - "8080:8000"
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      DATABASE_URL: postgresql://admin:admin@postgres:5432/cloud
+    depends_on:
+      - postgres
+      - mlflow
+      - minio
+    networks:
+      - cloud-int-net
+      - cloud-api-net
+    restart: unless-stopped
+
+networks:
+  mqtt-net:
+  cloud-api-net:
+  cassandra-net:
+  cloud-int-net:
+
+volumes:
+  cassandra1_data:
+  minio_data:
+  postgres_data:
