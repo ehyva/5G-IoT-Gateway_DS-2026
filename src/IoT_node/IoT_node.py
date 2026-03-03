@@ -5,7 +5,7 @@ import socket
 import random
 import json
 import math
-import datetime
+from datetime import datetime
 
 class IoTSensor:
 
@@ -40,6 +40,10 @@ class IoTSensor:
             print("JSON parsing failed: " + str(e))
 
         sock.close()
+
+    def log(self, message):
+        timestamp = datetime.now().isoformat()
+        print(f"[{timestamp}] {message}", flush=True)  # flush=True for immediate output
 
     def start(self):
 
