@@ -1,11 +1,16 @@
 import paho.mqtt.client as mqtt
 import time
+import datetime
 import os
 import signal
 from datetime import datetime
 import socket
 import json
-from concurrent.futures import ThreadPoolExecutor
+import torch
+import joblib
+import numpy as np
+import pandas as pd
+
 
 class EdgeGateway:
     def __init__(self): 
@@ -17,8 +22,13 @@ class EdgeGateway:
         self.messages_handled = 0
         self.message_load = 0
 
-        self.mqtt_topic_list = []
+        # Load ML model
+        self.ml_model = torch.jit.load("model_scripted.pt")
+        self.ml_scaler = joblib.load("scaler.pkl")
+        self.ml_threshold = joblib.load("threshold.pkl")
 
+        # MQTT client configuration
+        self.mqtt_topic_list = []
         self.mqtt_broker = os.getenv('MQTT_SERVER', "localhost")
         self.mqtt_port = int(os.getenv('MQTT_PORT', "1883"))
 
@@ -37,16 +47,74 @@ class EdgeGateway:
         for topic in self.mqtt_topic_list: 
             client.subscribe(topic)
 
-        #client.subscribe("$share/gateways/sensor/#")
-        #for sensor in self.sensor_list:
-        #    client.subscribe("sensor/" + str(sensor) + "/#")
-
     # The callback for when a PUBLISH message is received from the server.
     def on_message(self, client, userdata, msg):
-        #self.log(msg.topic+" "+str(msg.payload))
+        #Get message info and run ML inference
+        sensor_id = int(msg.topic.split("/")[1])
+        measurement = json.loads(msg.payload)
+        ml_result = self.run_prediction(measurement)
+
+        measurement_result = {
+            "temperature": measurement["temperature"],
+            "timestamp": int(measurement["timestamp"]),
+            "sensor_id": sensor_id,
+            "anomaly": ml_result["anomaly"]
+        }
+        
+        #TODO: Send result to database
+
         self.messages_handled += 1
         self.message_load += 1
 
+    def run_prediction(self, measurement):
+
+        # Preprocess measurement
+        date = datetime.fromtimestamp(measurement["timestamp"])
+        df = pd.DataFrame([{
+            "Month": date.month,
+            "Day": date.day,
+            "Hour": date.hour,
+            "Average temperature [°C]": measurement["temperature"]
+        }])
+        
+        features = self.preprocess_dataframe(df)
+        x = self.ml_scaler.transform(features)
+        x_tensor = torch.tensor(x, dtype=torch.float32)
+
+        with torch.no_grad():
+            recon = self.ml_model(x_tensor)
+            error = torch.mean((recon - x_tensor)**2).item()
+
+        return {
+            "reconstruction_error": error,
+            "threshold": self.ml_threshold,
+            "anomaly": error > self.ml_threshold
+        }
+
+    def preprocess_dataframe(self, df: pd.DataFrame):
+
+        FEATURE_COLUMNS = [
+            "Month_sin", "Month_cos",
+            "Day_sin", "Day_cos",
+            "Hour_sin", "Hour_cos",
+            "Average temperature [°C]"
+        ]
+
+        df = df.copy()
+
+        #df["Hour"] = df["Time [UTC]"].str.split(":").str[0].astype(int)
+        df["Hour"] = df["Hour"]
+
+        df["Month_sin"] = np.sin(2 * np.pi * df["Month"] / 12)
+        df["Month_cos"] = np.cos(2 * np.pi * df["Month"] / 12)
+
+        df["Day_sin"] = np.sin(2 * np.pi * df["Day"] / 31)
+        df["Day_cos"] = np.cos(2 * np.pi * df["Day"] / 31)
+
+        df["Hour_sin"] = np.sin(2 * np.pi * df["Hour"] / 24)
+        df["Hour_cos"] = np.cos(2 * np.pi * df["Hour"] / 24)
+
+        return df[FEATURE_COLUMNS]
 
     def log(self, message):
         timestamp = datetime.now().isoformat()
@@ -80,15 +148,14 @@ class EdgeGateway:
 
         self.mqtt_topic_list.append("$share/gateways/sensor/#")
         self.mqtt_client.subscribe("$share/gateways/sensor/#")
+    
+        while self.running:
 
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            while self.running:
-
-                # Check if coordinator is running. Shut down gateway if coordinator is not reachable for 3 times
-                if logging_time < time.monotonic():
-                    logging_time = time.monotonic() + 10
-                    self.log(f"Total messages handled: {self.messages_handled}\nMessages handled in last 10 seconds: {self.message_load}")
-                    self.message_load = 0
+            # Check if coordinator is running. Shut down gateway if coordinator is not reachable for 3 times
+            if logging_time < time.monotonic():
+                logging_time = time.monotonic() + 10
+                self.log(f"Total messages handled: {self.messages_handled}\nMessages handled in last 10 seconds: {self.message_load}")
+                self.message_load = 0
 
         self.log("Server stopped")
 

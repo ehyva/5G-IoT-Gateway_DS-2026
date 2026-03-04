@@ -87,7 +87,7 @@ class IoTSensor:
 
             mqtt_client.publish(f"sensor/{self.sensor_id}/temperature", json.dumps(mqtt_message))
             
-            print(f"Published temp: {temperature} @ {datetime.datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')}")
+            #print(f"Published temp: {temperature} @ {datetime.datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')}")
 
             time.sleep(1)
 
