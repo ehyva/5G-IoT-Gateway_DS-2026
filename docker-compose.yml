@@ -47,22 +47,6 @@ services:
 #    networks:
 #      - cassandra-net
 
-  coordinator:
-    build:
-      context: .
-      dockerfile: dockerfiles/Dockerfile.coordinator
-    container_name: coordinator
-    environment:
-      MQTT_SERVER: "mosquitto"
-      MQTT_PORT: "1883"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./docker-compose.yml:/docker-compose.yml
-    depends_on:
-      - mqtt
-    networks:
-      - mqtt-net
-
   iot_node:
     build:
       context: .
