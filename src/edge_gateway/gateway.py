@@ -106,6 +106,7 @@ class Database:
                 location TEXT,
                 sensor_type TEXT,
                 sensor_value FLOAT,
+                timestamp TIMESTAMP,
                 anomaly BOOLEAN,
                 time TIMEUUID,
                 day_bucket DATE,
@@ -135,8 +136,8 @@ class Database:
         if self.INSERT_MEASUREMENTS_STMT is None:
             prepared = self.session.prepare(textwrap.dedent(
                 """
-                INSERT INTO measurements (sensor_id, location, sensor_type, sensor_value, anomaly, time, day_bucket, db_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO measurements (sensor_id, location, sensor_type, sensor_value, timestamp, anomaly, time, day_bucket, db_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
             ))
             prepared.consistency_level = self.consistency_level
@@ -144,7 +145,7 @@ class Database:
         
         future = self.session.execute_async(
             self.INSERT_MEASUREMENTS_STMT,
-            (sensor_id, location, sensor_type, sensor_value, anomaly, time, day_bucket, uuid.uuid4()),
+            (sensor_id, location, sensor_type, sensor_value, epoch_ms, anomaly, time, day_bucket, uuid.uuid4()),
         )
 
         future.add_callbacks(self.log_insert_success, self.log_error)
