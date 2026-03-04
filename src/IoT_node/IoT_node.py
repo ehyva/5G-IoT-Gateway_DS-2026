@@ -72,10 +72,10 @@ class IoTSensor:
         random.seed(self.sensor_id)
 
         self.n = 0
-        temp_min = -15.0
-        temp_max = 25.0
-        self.a = temp_min + (temp_max - temp_min) / 2.0
-        self.b = (temp_max - temp_min) / 2.0
+        self.temp_min = -15.0
+        self.temp_max = 25.0
+        self.a =  self.temp_min + (self.temp_max -  self.temp_min) / 2.0
+        self.b = (self.temp_max -  self.temp_min) / 2.0
 
         while True:
             timestamp, temperature = self.hourly_data()
@@ -85,7 +85,7 @@ class IoTSensor:
                 "temperature": temperature
             }
 
-            mqtt_client.publish(f"sensor/{self.sensor_id}/temperature", json.dumps(mqtt_message))
+            mqtt_client.publish(f"sensor/{self.sensor_id}/temperature", json.dumps(mqtt_message), qos=1)
             
             #print(f"Published temp: {temperature} @ {datetime.datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -94,7 +94,7 @@ class IoTSensor:
     # Generate noisy date, using real timestamp
     def noisy_data(self):
         timestamp = int(time.time())
-        temperature = random.uniform(temp_min, temp_max)
+        temperature = random.uniform(self.temp_min, self.temp_max)
         self.n += 1
         return timestamp, temperature
     

@@ -2,13 +2,12 @@ FROM python:3.10
 
 WORKDIR /app
 
-
 COPY ../src/cloud/trainer/requirements.txt .
+
 RUN pip install --no-cache-dir -r requirements.txt
 
-
-COPY ../src/cloud/trainer/ .
-
+COPY ../src/cloud/trainer/model.py .
+COPY ../src/cloud/trainer/train.py .
 
 
 CMD ["python", "train.py"]

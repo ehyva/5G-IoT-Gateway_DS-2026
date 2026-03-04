@@ -12,6 +12,41 @@ services:
     networks:
       - mqtt-net
 
+  cassandra1:
+    image: cassandra:4.1
+    container_name: cassandra1
+    hostname: cassandra1
+    ports:
+      - "9042:9042"
+    environment:
+      - CASSANDRA_CLUSTER_NAME=TestCluster
+      - CASSANDRA_SEEDS=cassandra1
+      - CASSANDRA_LISTEN_ADDRESS=cassandra1
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra1
+      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+    networks:
+      - cassandra-net
+    volumes:
+      - cassandra1_data:/var/lib/cassandra
+
+# Example of adding another node to this service
+#  cassandra2:
+#    image: cassandra:4.1
+#    container_name: cassandra2
+#    hostname: cassandra2
+#    environment:
+#      - CASSANDRA_CLUSTER_NAME=TestCluster
+#      - CASSANDRA_SEEDS=cassandra1
+#      - CASSANDRA_LISTEN_ADDRESS=cassandra2
+#      - CASSANDRA_BROADCAST_ADDRESS=cassandra2
+#      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+#    depends_on:
+#      - cassandra1
+#    volumes:
+#      - cassandra2_data:/var/lib/cassandra
+#    networks:
+#      - cassandra-net
+
   coordinator:
     build:
       context: .
@@ -52,72 +87,20 @@ services:
     environment:
       MQTT_SERVER: "mosquitto"
       MQTT_PORT: "1883"
+      CASSANDRA_IP: "cassandra1"
+      CASSANDRA_PORT: "9042"
+      REPLICATION_FACTOR: "1" # RF
+      CONSISTENCY_LEVEL: "one" # one or quorum, quorum asks ceil(RF/2)+1 nodes before write or read is succesful.
 #      GATEWAY_ID: "1"
     deploy:
       replicas: 2
     depends_on:
       - mqtt
+      - cassandra1
     networks:
       - mqtt-net
       - cloud-api-net
-
-  cassandra1:
-    image: cassandra:4.1
-    container_name: cassandra1
-    hostname: cassandra1
-    ports:
-      - "9042:9042"
-    environment:
-      - CASSANDRA_CLUSTER_NAME=TestCluster
-      - CASSANDRA_SEEDS=cassandra1
-      - CASSANDRA_LISTEN_ADDRESS=cassandra1
-      - CASSANDRA_BROADCAST_ADDRESS=cassandra1
-      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
-    networks:
       - cassandra-net
-    volumes:
-      - cassandra1_data:/var/lib/cassandra
-
-# Example of adding another node to this service
-#  cassandra2:
-#    image: cassandra:4.1
-#    container_name: cassandra2
-#    hostname: cassandra2
-#    environment:
-#      - CASSANDRA_CLUSTER_NAME=TestCluster
-#      - CASSANDRA_SEEDS=cassandra1
-#      - CASSANDRA_LISTEN_ADDRESS=cassandra2
-#      - CASSANDRA_BROADCAST_ADDRESS=cassandra2
-#      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
-#    depends_on:
-#      - cassandra1
-#    volumes:
-#      - cassandra2_data:/var/lib/cassandra
-#    networks:
-#      - cassandra-net
-
-  database-api:
-    build:
-      context: .
-      dockerfile: dockerfiles/Dockerfile.database-api
-    container_name: database-api
-    hostname: database-api
-    environment:
-      CASSANDRA_IP: "cassandra1"
-      CASSANDRA_PORT: "9042"
-      SERVER_HOST: "0.0.0.0"
-      PORT: "8000"
-      REPLICATION_FACTOR: "1" # RF
-      CONSISTENCY_LEVEL: "one" # one or quorum, quorum asks ceil(RF/2)+1 nodes before write or read is succesful.
-    ports:
-      - "8000:8000"
-    networks:
-      - cassandra-net
-      - cloud-api-net
-    depends_on:
-      - cassandra1
-    restart: unless-stopped # It takes a while for cassandra to setup, so this can't connect right away and exits
-
 
   grafana:
     image: grafana/grafana-enterprise

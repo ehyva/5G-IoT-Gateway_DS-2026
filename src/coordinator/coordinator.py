@@ -4,9 +4,6 @@ import os
 import signal
 from datetime import datetime
 import socket
-import json
-import random
-from concurrent.futures import ThreadPoolExecutor
 
 class Coordinator:
     def __init__(self): 

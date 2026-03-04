@@ -4,11 +4,14 @@ FROM python:3.14-slim
 # Set the working directory
 WORKDIR /app
 
-# Copy the application code
-COPY ../src/IoT_node/ .
+# Copy dependencies
+COPY ../src/IoT_node/requirements.txt .
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the application code, this way dependecies are not redownloaded at each docker-compose build, if only script.py changed
+COPY ../src/IoT_node/IoT_node.py .
 
 # Create directory for certificates
 #RUN mkdir -p /app/certs

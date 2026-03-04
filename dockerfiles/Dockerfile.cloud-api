@@ -3,9 +3,16 @@ FROM python:3.10
 WORKDIR /app
 
 COPY ../src/cloud/api/requirements.txt .
+
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY ../src/cloud/api/ .
+COPY ../src/cloud/api/database.py .
+COPY ../src/cloud/api/model_loader.py .
+COPY ../src/cloud/api/model.py .
+COPY ../src/cloud/api/models.py .
+COPY ../src/cloud/api/preprocessing.py .
+COPY ../src/cloud/api/schemas.py .
+COPY ../src/cloud/api/main.py .
 
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

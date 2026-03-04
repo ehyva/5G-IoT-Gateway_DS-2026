@@ -1,14 +1,20 @@
 # Use a lightweight Python base image
-FROM python:3.14-slim
+FROM python:3.10.19-slim
 
 # Set the working directory
 WORKDIR /app
 
-# Copy the application code
-COPY ../src/edge_gateway/ .
+# Copy dependencies
+COPY ../src/edge_gateway/requirements.txt .
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the application code, this way dependecies are not redownloaded at each docker-compose build, if only script.py changed
+COPY ../src/edge_gateway/model_scripted.pt .
+COPY ../src/edge_gateway/scaler.pkl .
+COPY ../src/edge_gateway/threshold.pkl .
+COPY ../src/edge_gateway/gateway.py .
 
 #EXPOSE 8000
 
