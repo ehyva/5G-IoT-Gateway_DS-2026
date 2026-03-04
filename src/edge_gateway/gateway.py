@@ -388,7 +388,6 @@ class EdgeGateway:
     
         while self.running:
 
-            # Check if coordinator is running. Shut down gateway if coordinator is not reachable for 3 times
             if logging_time < time.monotonic():
                 logging_time = time.monotonic() + 10
                 self.log(f"Total messages handled: {self.messages_handled}\nMessages handled in last 10 seconds: {self.message_load}")
